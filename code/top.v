@@ -48,11 +48,11 @@ wire [2:0]       key_value;       // 按键值（防抖后）
 wire [15:0]      data_modulus;    // FFT取模结果
 wire             data_valid;      // 数据有效信号
 wire             fft_shutdown;    // FFT关闭信号
-wire [7:0]       wr_addr;         // RAM写地址
+wire [7:0]      wr_addr;         // RAM写地址
 wire [15:0]      wr_data;         // RAM写数据
 wire             wr_en;           // RAM写使能
 wire             wr_done;         // RAM写完成
-wire [7:0]       rd_addr;         // RAM读地址
+wire [7:0]      rd_addr;         // RAM读地址
 wire [15:0]      rd_data;         // RAM读数据
 wire             wave_vaild;      // 波形有效信号
 
@@ -70,14 +70,25 @@ assign rst_n = sys_rst_n && locked;
 
 // PLL IP核
 clk_wiz_0 u_clk_wiz_0(
-    .clk_out1 (clk_100m),        // 100MHz时钟
+    .clk_out1 (clk_100m),        // 
     .clk_out2 (clk_50m),         // 50MHz时钟
-    .clk_out3 (clk_32m),         // 32MHz时钟
-    .clk_out4 (clk_32m_120),         // 32MHz时钟相移120
-    .clk_out5 (clk_2m),          // 2MHz时钟(载波频率)
+    .clk_out3 (clk_50m_180),     // 50MHz时钟相移180
+    .clk_out4 (clk_32m),         // 32MHz时钟
 
     .locked   (locked),          // PLL锁定信号
     .clk_in1  (sys_clk)          // 系统输入时钟
+);
+// PLL IP核
+clk_wiz_1 u_clk_wiz_1(
+    .clk_out1 (clk_8192k),        // 8192kHz采样时钟
+
+    .clk_in1  (clk_32m)          // 系统输入时钟
+);
+//2MHz时钟(载波频率)、、注意因为PLL塞不下那么多时钟所以专门写个2m的时钟模块。
+clk_div_2m u_clk_div_2m (
+    .clk_32m (clk_32m),  // 输入50MHz时钟
+    .rst_n   (rst_n),    // 全局复位
+    .clk_2m  (clk_2m)    // 输出2MHz时钟
 );
 
 // 按键防抖模块
@@ -88,7 +99,7 @@ key_debounce u_key_debounce(
     .key_value(key_value)
 );
 
-// FFT控制模块
+// FFT控制模块、、这个能不能去掉，以后换成每0.5s自启动一次。
 fft_ctrl u_fft_ctrl(
     .clk(clk_50m),
     .rst_n(rst_n),
