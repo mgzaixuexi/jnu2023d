@@ -48,11 +48,11 @@ wire [2:0]       key_value;       // 按键值（防抖后）
 wire [15:0]      data_modulus;    // FFT取模结果
 wire             data_valid;      // 数据有效信号
 wire             fft_shutdown;    // FFT关闭信号
-wire [11:0]      wr_addr;         // RAM写地址
+wire [7:0]       wr_addr;         // RAM写地址
 wire [15:0]      wr_data;         // RAM写数据
 wire             wr_en;           // RAM写使能
 wire             wr_done;         // RAM写完成
-wire [11:0]      rd_addr;         // RAM读地址
+wire [7:0]       rd_addr;         // RAM读地址
 wire [15:0]      rd_data;         // RAM读数据
 wire             wave_vaild;      // 波形有效信号
 
@@ -152,8 +152,8 @@ ram_wr_ctrl u_ram_wr_ctrl(
     .fft_shutdown(fft_shutdown)
 );
 
-// RAM IP核 (4096x16)
-ram_4096x16 u_ram_4096x16 (
+// RAM IP核 (256x16)
+ram_256x16 u_ram_256x16 (
     .clka(clk_50m),              // FFT时钟
     .wea(wr_en),                 // 写使能
     .addra(wr_addr),             // 写地址

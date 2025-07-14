@@ -32,7 +32,7 @@ module modulation_detect
 	input 				en,//使能，上升沿有效，fft取模数据写入ram完成再拉高
 	input 				key,//启动按键，重置识别
     input 		[15:0] 	rd_data,
-    output reg 	[11:0] 	rd_addr,
+    output reg 	[7:0] 	rd_addr,
     output reg 	[2:0]	mode_type,
     output reg 			valid
     );
