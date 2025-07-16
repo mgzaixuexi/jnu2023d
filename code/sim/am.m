@@ -1,7 +1,7 @@
 % 参数设置
 Fs = 8.192e6;       % 采样频率8.192MHz
 Fc = 2e6;           % 载波频率2MHz
-Fm = 1e3;           % 调制信号频率1kHz
+Fm = 5e3;           % 调制信号频率5kHz
 Vpp = 0.1;          % 载波峰峰值100mV（幅值50mV）
 N = 81920;           % 采样点数
 bits = 10;          % 10位量化
@@ -10,7 +10,7 @@ bits = 10;          % 10位量化
 t = (0:N-1)/Fs;
 
 % 生成调制信号（范围[-1, 1]，再缩放到调制深度）
-m = 0.5;                            % 调制深度
+m = 0.3;                            % 调制深度
 mod_signal = m * sin(2*pi*Fm*t);    % 范围: [-0.5, 0.5]
 
 % 生成载波信号（幅值50mV）
@@ -27,7 +27,7 @@ AM_normalized = (AM_signal - min(AM_signal)) / (max(AM_signal) - min(AM_signal))
 AM_quantized = uint16(round(AM_normalized * (2^bits - 1)));
 
 % 写入文件（二进制字符串，每行10位）
-fid = fopen('AM_signal_2MHz_1kHz.txt', 'w');
+fid = fopen('AM_signal_2MHz_5kHz.txt', 'w');
 for i = 1:N
     fprintf(fid, '%s\n', dec2bin(AM_quantized(i), bits));
 end
