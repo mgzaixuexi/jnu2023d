@@ -1,6 +1,5 @@
 % 文件路径
-file_path = 'D:\vivado\project\ti\jnu2023d_test\code\sim\AM_signal_2MHz_1kHz.txt';
-
+file_path = "D:\vivado\project\ti\jnu2023d_test\code\sim\ask_signal_10bit.txt"
 % 打开文件
 fid = fopen(file_path, 'r');
 if fid == -1

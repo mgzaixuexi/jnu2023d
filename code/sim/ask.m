@@ -1,0 +1,241 @@
+% 参数设置
+Fs = 8.192e6;       % 采样频率 8.192 MHz
+N = 8192;           % 采样点数 8192
+fc = 2e6;           % 载波频率 2 MHz
+bit_rates = [6e3, 8e3, 10e3];  % 码率 [6kbps, 8kbps, 10kbps]
+br_idx = 2;%选择码率
+f_shift = 25e3;    % 2FSK频偏 100 kHz
+t = (0:N-1)/Fs;     % 时间序列
+
+
+% 循环处理不同码率
+    bit_rate = bit_rates(br_idx);
+    
+    % 计算比特数和每比特采样点数
+    num_bits = floor(N * bit_rate / Fs);
+    samples_per_bit = floor(Fs / bit_rate);
+    
+    % 生成随机二进制序列
+    bits = randi([0, 1], 1, num_bits);
+    
+    % 1. 2ASK信号生成
+    ask_signal = zeros(1, N);
+    for i = 1:num_bits
+        start_idx = (i-1)*samples_per_bit + 1;
+        end_idx = min(i*samples_per_bit, N);
+        
+        if bits(i) == 1
+            ask_signal(start_idx:end_idx) = cos(2*pi*fc*t(start_idx:end_idx));
+        else
+            ask_signal(start_idx:end_idx) = 0;
+        end
+    end
+% 将信号归一化到0-1范围并转换为10位无符号整数
+signal_normalized = (ask_signal + 0.05) / 0.1; % 假设信号范围为-50mV到+50mV
+signal_10bit = round(signal_normalized * (2^10-1));
+signal_10bit = min(max(signal_10bit, 0), 1023); % 限制在0-1023范围内
+
+% 将数据写入TXT文件
+filename = 'ask_signal_8bit.txt';
+fid = fopen(filename, 'w');
+for i = 1:N
+    % 格式化为10位二进制，前面补零
+    binary_str = dec2bin(signal_10bit(i), 10);
+    fprintf(fid, '%s\n', binary_str);
+end
+fclose(fid);
+
+% 创建图形窗口
+figure('Position', [100, 100, 1200, 600]);
+
+% 绘制原始比特序列（前20个比特）
+subplot(2,1,1);
+stem(bits(1:min(20,num_bits)), 'filled', 'LineWidth', 1.5, 'MarkerSize', 8);
+title(['原始二进制序列 (', num2str(bit_rate/1e3), 'kbps)']);
+xlabel('比特序号');
+ylabel('比特值');
+xlim([0.5 min(20,num_bits)+0.5]);
+ylim([-0.1 1.1]);
+grid on;
+
+% 标注关键参数
+text(0.7, 0.8, sprintf('总比特数: %d\n每比特采样点数: %d', num_bits, samples_per_bit),...
+    'FontSize', 10, 'BackgroundColor', 'white');
+
+% 绘制2ASK信号（前10个比特周期对应的采样点）
+show_samples = min(10*samples_per_bit, N);
+subplot(2,1,2);
+plot(t(1:show_samples)*1e6, ask_signal(1:show_samples), 'LineWidth', 1.5);
+title(['2ASK调制信号 (载波 ', num2str(fc/1e6), 'MHz)']);
+xlabel('时间 (\mus)');
+ylabel('幅度');
+xlim([0 t(show_samples)*1e6]);
+grid on;
+
+% 标注载波周期
+hold on;
+carrier_period = 1/fc*1e6; % 载波周期（微秒）
+for x = 0:carrier_period:t(show_samples)*1e6
+    line([x x], ylim, 'Color', 'r', 'LineStyle', ':', 'LineWidth', 0.5);
+end
+hold off;
+
+% 添加图例说明
+legend('2ASK信号', '载波周期', 'Location', 'northeast');
+
+% 打印关键参数
+fprintf('=== 参数详情 ===\n');
+fprintf('采样频率: %.3f MHz\n', Fs/1e6);
+fprintf('载波频率: %.3f MHz\n', fc/1e6);
+fprintf('码率: %.1f kbps\n', bit_rate/1e3);
+fprintf('每比特持续时间: %.2f μs\n', 1/bit_rate*1e6);
+fprintf('每比特采样点数: %d\n', samples_per_bit);
+fprintf('总传输比特数: %d\n', num_bits);
+
+%% 2ASK解调实现
+% 1. 整流（全波整流）
+rectified = abs(ask_signal);
+
+% 2. 低通滤波设计
+cutoff_freq = bit_rate * 1.5; % 截止频率设为码率的1.5倍
+[b, a] = butter(4, cutoff_freq/(Fs/2));
+
+% 3. 滤波处理
+filtered = filtfilt(b, a, rectified);
+
+% 4. 判决门限自动计算
+threshold = (max(filtered) + min(filtered)) / 2 * 0.8; % 经验系数
+
+% 5. 采样判决
+sampled_bits = zeros(1, num_bits);
+for i = 1:num_bits
+    start_idx = (i-1)*samples_per_bit + 1;
+    end_idx = min(i*samples_per_bit, N);
+    segment = filtered(start_idx:end_idx);
+    
+    % 取每个比特中间部分的平均值
+    mid_idx = round(length(segment)/2);
+    window_size = round(samples_per_bit/4);
+    window = segment(max(1, mid_idx-window_size):min(length(segment), mid_idx+window_size));
+    
+    sampled_bits(i) = mean(window) > threshold;
+end
+
+%% 误码率计算
+bit_errors = sum(bits ~= sampled_bits);
+ber = bit_errors / num_bits;
+
+%% 解调结果可视化
+figure('Position', [100, 100, 1200, 900]);
+
+% 1. 整流后信号
+subplot(4,1,1);
+plot(t(1:show_samples)*1e6, rectified(1:show_samples), 'LineWidth', 1.5);
+title('整流后信号');
+xlabel('时间 (\mus)');
+ylabel('幅度');
+grid on;
+
+% 2. 滤波后信号
+subplot(4,1,2);
+plot(t(1:show_samples)*1e6, filtered(1:show_samples), 'LineWidth', 1.5);
+hold on;
+plot(xlim, [threshold threshold], 'r--', 'LineWidth', 1.5);
+title(['滤波后信号 (截止频率: ', num2str(cutoff_freq/1e3), 'kHz)']);
+xlabel('时间 (\mus)');
+ylabel('幅度');
+legend('滤波信号', '判决门限', 'Location', 'northeast');
+grid on;
+
+% 4. 眼图分析
+subplot(4,1,4);
+eye_diagram(filtered, samples_per_bit, 3); % 自定义眼图函数
+title('解调信号眼图');
+xlabel('时间 (每个比特周期)');
+ylabel('幅度');
+grid on;
+
+%% 打印解调结果
+fprintf('\n=== 解调结果 ===\n');
+fprintf('判决门限: %.4f\n', threshold);
+fprintf('误码数: %d\n', bit_errors);
+fprintf('误码率: %.2f%%\n', ber*100);
+
+%% 眼图绘制函数
+function eye_diagram(signal, samples_per_bit, num_eyes)
+    persistent fig_count;
+    if isempty(fig_count)
+        fig_count = 1;
+    else
+        fig_count = fig_count + 1;
+    end
+    
+    figure(100 + fig_count);
+    hold on;
+    
+    % 计算可显示的完整眼图数量
+    num_segments = floor(length(signal)/samples_per_bit) - 1;
+    num_segments = min(num_segments, num_eyes*3); % 限制显示数量
+    
+    for i = 1:num_segments
+        start_idx = (i-1)*samples_per_bit + 1;
+        end_idx = start_idx + samples_per_bit*2 - 1;
+        
+        if end_idx > length(signal)
+            break;
+        end
+        
+        segment = signal(start_idx:end_idx);
+        time_normalized = (0:length(segment)-1)/samples_per_bit;
+        plot(time_normalized, segment, 'b-', 'LineWidth', 0.5);
+    end
+    
+    title(['2ASK解调信号眼图 (', num2str(num_segments), '个眼图)']);
+    xlabel('归一化时间 (比特周期)');
+    ylabel('幅度');
+    grid on;
+    hold off;
+end
+
+%% FFT频谱分析（添加在解调结果可视化部分之后）
+%% 频谱分析（0-3MHz范围）
+% FFT参数
+N_fft = 2^nextpow2(N);
+f = Fs/N_fft*(0:N_fft/2-1); % 频率轴(单边谱)
+freq_range = f <= 3e6;      % 限制在0-3MHz
+
+% 整流信号FFT
+rectified = abs(ask_signal);
+fft_rectified = abs(fft(rectified, N_fft));
+fft_rectified = fft_rectified(1:N_fft/2);
+fft_rectified = fft_rectified/max(fft_rectified);
+
+% 滤波后FFT
+cutoff_freq = bit_rate * 1.5;
+[b,a] = butter(4, cutoff_freq/(Fs/2));
+filtered = filtfilt(b,a,rectified);
+fft_filtered = abs(fft(filtered, N_fft));
+fft_filtered = fft_filtered(1:N_fft/2);
+fft_filtered = fft_filtered/max(fft_filtered);
+
+% 绘制频谱
+subplot(1,2,2);
+semilogy(f(freq_range)/1e3, fft_rectified(freq_range), 'b', 'LineWidth', 1.5);
+hold on;
+semilogy(f(freq_range)/1e3, fft_filtered(freq_range), 'r', 'LineWidth', 1.5);
+plot([fc/1e3 fc/1e3], ylim, 'k--', 'LineWidth', 1);
+plot([cutoff_freq/1e3 cutoff_freq/1e3], ylim, 'g--', 'LineWidth', 1);
+title(['频谱分析 (0-3MHz) | 载波 ', num2str(fc/1e6), 'MHz']);
+xlabel('频率 (kHz)');
+ylabel('归一化幅度');
+legend('整流信号', '滤波信号', '载波频率', '截止频率');
+grid on;
+hold off;
+
+%% 关键参数显示
+fprintf('=== 系统参数 ===\n');
+fprintf('采样频率: %.3f MHz\n', Fs/1e6);
+fprintf('载波频率: %.3f MHz\n', fc/1e6);
+fprintf('码率: %.1f kbps\n', bit_rate/1e3);
+fprintf('每比特采样点数: %d\n', samples_per_bit);
+fprintf('总传输比特数: %d\n', num_bits);
