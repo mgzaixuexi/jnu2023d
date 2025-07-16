@@ -13,7 +13,7 @@ module ask_demod(
 
 // 参数定义
 parameter THRESHOLD = 16'd8000;  // 固定判决门限
-parameter BIT_RATE = 4'd8;      // 固定码率10kbps
+parameter BIT_RATE = 4'd6;      // 测试码率为6kbps
 
 // 中间信号
 reg signed [15:0] centered;      // 中心偏移后的信号

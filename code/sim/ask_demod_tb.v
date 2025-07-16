@@ -37,7 +37,7 @@ initial begin
     forever #17 clk_30M = ~clk_30M;  // 半周期=17ns
 end
 // 读取文件中的数据
-reg [9:0] mem [0:8192];
+reg [9:0] mem [0:81920];
 integer i;
 reg file_loaded = 0;     // 文件加载完成标志
 
@@ -52,14 +52,14 @@ initial begin
     rst_n = 1;
 
     // 读取数据文件（注意文件格式）
-    $readmemb("D:/vivado/project/ti/jnu2023d_test/code/sim/ask_signal_8bit.txt", mem);
+    $readmemb("D:/vivado/project/ti/jnu2023d_test/code/sim/ask_signal_6bit.txt", mem);
     file_loaded = 1;     // 文件加载完成标志
     // 读取测试数据文件
     if(file_loaded)begin
-        for (i = 0; i < 8192; ) begin
+        for (i = 0; i < 81920; ) begin
             @(posedge clk_8192k);
                 ad_data <= mem[i];
-                i <= (i<4095)?i + 1:0;
+                i <= (i<81919)?i + 1:0;
         end
     end
     // 等待FFT处理完成（根据实际情况调整延时）

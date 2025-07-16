@@ -1,9 +1,9 @@
 % 参数设置
 Fs = 8.192e6;       % 采样频率 8.192 MHz
-N = 8192;           % 采样点数 8192
+N = 81920;           % 采样点数 81920
 fc = 2e6;           % 载波频率 2 MHz
 bit_rates = [6e3, 8e3, 10e3];  % 码率 [6kbps, 8kbps, 10kbps]
-br_idx = 2;%选择码率
+br_idx = 1;%选择码率
 f_shift = 25e3;    % 2FSK频偏 100 kHz
 t = (0:N-1)/Fs;     % 时间序列
 
@@ -19,24 +19,33 @@ t = (0:N-1)/Fs;     % 时间序列
     bits = randi([0, 1], 1, num_bits);
     
     % 1. 2ASK信号生成
-    ask_signal = zeros(1, N);
-    for i = 1:num_bits
-        start_idx = (i-1)*samples_per_bit + 1;
-        end_idx = min(i*samples_per_bit, N);
-        
-        if bits(i) == 1
-            ask_signal(start_idx:end_idx) = cos(2*pi*fc*t(start_idx:end_idx));
-        else
-            ask_signal(start_idx:end_idx) = 0;
-        end
+% 修改后代码（仅增加01随机性）
+ask_signal = zeros(1, N);
+for i = 1:num_bits
+    start_idx = (i-1)*samples_per_bit + 1;
+    end_idx = min(i*samples_per_bit, N);
+    
+    if bits(i) == 1
+        % 保持载波频率不变，但添加以下随机性：
+        % 1. 幅度微小波动 (±5%)
+        amp = 1 * (0.95 + 0.1*rand()); 
+        % 2. 相位微小偏移 (±10度)
+        phase_shift = pi/18 * (2*rand()-1); 
+        ask_signal(start_idx:end_idx) = amp * cos(2*pi*fc*t(start_idx:end_idx) + phase_shift);
+    else
+        % 零电平添加微小噪声 (1%幅度)
+        ask_signal(start_idx:end_idx) = 0.01 * randn(1, end_idx-start_idx+1);
     end
+end
+
+
 % 将信号归一化到0-1范围并转换为10位无符号整数
 signal_normalized = (ask_signal + 0.05) / 0.1; % 假设信号范围为-50mV到+50mV
 signal_10bit = round(signal_normalized * (2^10-1));
 signal_10bit = min(max(signal_10bit, 0), 1023); % 限制在0-1023范围内
 
 % 将数据写入TXT文件
-filename = 'ask_signal_8bit.txt';
+filename = 'ask_signal_6bit.txt';
 fid = fopen(filename, 'w');
 for i = 1:N
     % 格式化为10位二进制，前面补零
