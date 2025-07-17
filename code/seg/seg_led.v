@@ -24,7 +24,7 @@ module seg_led(
 	 input [7:0] num1,//接freq_select1，或者说是waveA_freq
 	 input [7:0] num2,//接freq_select2，或者说是waveB_freq
 	 input       num3,//接wr_done
-	 output reg [5:0] seg_sel,
+	 output reg [4:0] seg_sel,
 	 output reg [7:0]seg_led
     );
 	
@@ -48,19 +48,19 @@ end
 
 
 always@(posedge sys_clk or negedge sys_rst_n) begin
-    if(!sys_rst_n) seg_sel<=6'b111_110;
-	 else if(counter==(F-1)) seg_sel<={seg_sel[4:0],seg_sel[5]};
+    if(!sys_rst_n) seg_sel<=5'b11_110;
+	 else if(counter==(F-1)) seg_sel<={seg_sel[3:0],seg_sel[4]};
 	 else seg_sel<=seg_sel;
 end
 
 always@(posedge sys_clk or negedge sys_rst_n) begin
     if(!sys_rst_n) seg_led<=8'b1111_1111;
 	 else case(seg_sel)
-	 6'b111_110: seg_led<=led(data0);
-	 6'b111_101: seg_led<=led(data1);
-	 6'b111_011: seg_led<=led(data2);
-	 6'b110_111: seg_led<=led(data3);
-	 6'b011_111: seg_led<=led({3'b0,num3});
+	 5'b11_110: seg_led<=led(data0);
+	 5'b11_101: seg_led<=led(data1);
+	 5'b11_011: seg_led<=led(data2);
+	 5'b10_111: seg_led<=led(data3);
+	 5'b01_111: seg_led<=led({3'b0,num3});
 	 default: seg_led<=8'b1111_1111; 
 	 endcase
 end
