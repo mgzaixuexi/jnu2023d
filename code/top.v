@@ -32,7 +32,7 @@ module top(
     output [9:0]  da_data,       // DAC数据输出(10位)
     
     // 数码管接口
-    output [5:0]  seg_sel,       // 数码管位选
+    output [4:0]  seg_sel,       // 数码管位选
     output [7:0]  seg_led        // 数码管段选
 );
 
