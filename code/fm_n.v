@@ -20,6 +20,7 @@ reg signed [10:0] ad_data_sign;
 reg signed [10:0] ad_data_sign_t;
 wire signed [21:0] ad_mult;
 wire signed [39:0] ad_mult_filter;
+wire signed [21:0] ad_mult_filter_f;
 always @(posedge clk_8m) begin
     if(~rst_n)ad_data_sign<=0;
     else
@@ -29,8 +30,10 @@ always @(posedge clk_8m) begin
 end
 assign ad_mult =ad_data_sign*ad_data_sign_t;
 
-wire [20:0]ad_mult_filter_out; 
-assign ad_mult_filter_out=ad_mult_filter[36:16];
+wire [39:0]ad_mult_filter_out; 
+assign ad_mult_filter_f=ad_mult_filter[37:16];
+
+
 // mult_gen_1 mult_gen_11 (
 //   .CLK(clk_8m),  // input wire CLK
 //   .A(ad_data_sign),      // input wire [10 : 0] A
@@ -39,13 +42,23 @@ assign ad_mult_filter_out=ad_mult_filter[36:16];
 // );
 
 fir_compiler_2 u_fir_compiler_03 (
-  .aclk(clk_50k),                              // input wire aclk
+  .aclk(clk_8m),                              // input wire aclk
   .s_axis_data_tvalid(1),  // input wire s_axis_data_tvalid
   .s_axis_data_tready(s_axis_data_tready),  // output wire s_axis_data_tready
   .s_axis_data_tdata(ad_mult),    // input wire [23 : 0] s_axis_data_tdata
   .m_axis_data_tvalid(m_axis_data_tvalid),  // output wire m_axis_data_tvalid
   .m_axis_data_tdata(ad_mult_filter)    // output wire [39 : 0] m_axis_data_tdata
 );
+
+fir_compiler_2 u_fir_compiler_04 (
+  .aclk(clk_8m),                              // input wire aclk
+  .s_axis_data_tvalid(1),  // input wire s_axis_data_tvalid
+  .s_axis_data_tready(s_axis_data_tready),  // output wire s_axis_data_tready
+  .s_axis_data_tdata(ad_mult_filter_f),    // input wire [23 : 0] s_axis_data_tdata
+  .m_axis_data_tvalid(m_axis_data_tvalid),  // output wire m_axis_data_tvalid
+  .m_axis_data_tdata(ad_mult_filter_out)    // output wire [39 : 0] m_axis_data_tdata
+);
+
 
 
 endmodule
