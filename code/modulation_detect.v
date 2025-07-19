@@ -24,17 +24,19 @@ module modulation_detect
     #(
     parameter   addr_2M = 100   ,  //2MHZ频点位置
     parameter   addr_2M_high   = 201, //2MHZ后100频点位置
-	parameter 	compare_num1 = 100//比较阈值，噪声最大值,随便写的
+	parameter 	compare_num1 = 100,//比较阈值，噪声最大值,随便写的
+	parameter 	compare_num2 = compare_num1*2
     )
 	(
     input 			   	clk,
     input 			   	rst_n,
 	input 				en,//使能，上升沿有效，fft取模数据写入ram完成再拉高
-	input 				key,//启动按键，重置识别
+	input 		[1:0]	key,//启动按键，重置识别
     input 		[15:0] 	rd_data,
     output reg 	[7:0] 	rd_addr,
     output reg 	[2:0]	mode_type,
-    output reg 			valid
+    output reg 			valid,
+	output reg			mode
     );
 
 //状态参数
@@ -47,8 +49,10 @@ reg [3:0] 	state;
 reg [3:0] 	next_state;	
 reg 		en_d0;
 reg 		en_d1;
-reg 		key_d0;
-reg 		key_d1;
+reg 		key0_d0;
+reg 		key0_d1;
+reg 		key1_d0;
+reg 		key1_d1;
 reg [5:0]	flag;
 reg [15:0]	wave_data1;
 reg [15:0]	wave_data2;
@@ -71,25 +75,42 @@ assign data_addr34a = (data_addr3 + data_addr4)>>1;
 	
 always @(posedge clk or negedge  rst_n)begin
 	if(~rst_n)begin
-	en_d0 <= 0;
-	en_d1 <= 0;
-	key_d0 <= 1;
-	key_d1 <= 1;
+		en_d0 <= 0;
+		en_d1 <= 0;
+		key0_d0 <= 1;
+		key0_d1 <= 1;
+		key1_d0 <= 1;
+		key1_d1 <= 1;
 	end
 	else begin
-	en_d0 <= en;
-	en_d1 <= en_d0;
-	key_d0 <= key;
-	key_d1 <= key_d0;
+		en_d0 <= en;
+		en_d1 <= en_d0;
+		key0_d0 <= key[0];
+		key0_d1 <= key0_d0;
+		key1_d0 <= key[1];
+		key1_d1 <= key1_d0;
 	end
 end
+	
+always @(posedge clk or negedge  rst_n)
+	if(~rst_n)
+		mode <= 0;
+	else if(~key0_d0 & key0_d1)
+		mode <= 0;
+	else if(~key1_d0 & key1_d1)
+		mode <= 1;
+	else 
+		mode <= mode;
+
+		
+	
 	
 //三段式状态机
 always @(posedge clk or negedge  rst_n)
 	if(~rst_n)
-	state <= idle;
+		state <= idle;
 	else 
-	state <= next_state;
+		state <= next_state;
 
 always @(*) begin
     next_state = idle;
@@ -106,7 +127,7 @@ always @(*) begin
 			    	next_state = done;
 		        else 
 		        	next_state = judge;
-		done	:if(~key_d0 & key_d1)//按键下降沿重置识别
+		done	:if((~key0_d0 & key0_d1) || (~key1_d0 & key1_d1))//按键下降沿重置识别
 					next_state = idle;
 				else 
 					next_state = done;
@@ -132,7 +153,10 @@ always @(posedge clk or negedge  rst_n)
 	else 
 		case(state)
 			idle:	begin
-						flag <= 6'b000_001;
+						if(~mode)
+							flag <= 6'b000_001;
+						else
+							flag <= 6'b000_100;
 						rd_addr <= 0;
 						wave_data1 <= 0;
 						wave_data2 <= 0;
@@ -192,7 +216,6 @@ always @(posedge clk or negedge  rst_n)
 						            	data_addr4 <= data_addr4;
 						            	end
 						default:	begin
-										flag <= flag;
 										wave_data1 <= wave_data1;
 										wave_data2 <= wave_data2;
 										wave_data3 <= wave_data3;
@@ -205,32 +228,53 @@ always @(posedge clk or negedge  rst_n)
 					endcase	
 					end
 			judge:	begin
-					if((wave_data3 > compare_num1) && (wave_data4 > compare_num1))
-						if(data_addr34a == addr_2M)begin
-							mode_type <= 3'b010;
-							flag <= {flag[4:0], 1'b0};
-							end
-						else begin
-							mode_type <= 3'b100;
-							flag <= {flag[4:0], 1'b0};
-							end
-					else if((wave_data1x8 >= rd_data) && (wave_data2x8 >= rd_data))
-							if(data_addr12a == addr_2M)begin
-								mode_type <= 3'b001;
-								flag <= {flag[4:0], 1'b0};
+					case(mode)
+						1'b0:	if((wave_data3 > compare_num1) && (wave_data4 > compare_num1))
+									if(data_addr34a == addr_2M)begin
+										mode_type <= 3'b010;
+										flag <= {flag[4:0], 1'b0};
+										end
+									else begin
+										mode_type <= 3'b100;
+										flag <= {flag[4:0], 1'b0};
+										end
+								else if((wave_data1x8 >= rd_data) && (wave_data2x8 >= rd_data) && (rd_data > wave_data1))
+										if(data_addr12a == addr_2M)begin
+											mode_type <= 3'b001;
+											flag <= {flag[4:0], 1'b0};
+											end
+										else begin
+											mode_type <= 3'b100;
+											flag <= {flag[4:0], 1'b0};
+											end
+								else begin
+									mode_type <= 3'b100;
+									flag <= {flag[4:0], 1'b0};
+									end
+						1'b1:	if(rd_data > wave_data3)begin
+									mode_type <= 3'b001;
+									flag <= {flag[4:0], 1'b0};
+									end
+								else if((wave_data3-wave_data4) >= compare_num2)begin
+									mode_type <= 3'b010;
+									flag <= {flag[4:0], 1'b0};
+									end
+								else begin
+									mode_type <= 3'b100;
+									flag <= {flag[4:0], 1'b0};
+						            end
+						default:begin
+									mode_type <= mode_type;
+									flag <= flag;
 								end
-							else begin
-								mode_type <= 3'b100;
-								flag <= {flag[4:0], 1'b0};
-								end
-					else begin
-						mode_type <= 3'b100;
-						flag <= {flag[4:0], 1'b0};
-						end
+					endcase			
 					end
 			done:	valid <= 1;
 			default:begin
-						flag <= 1;
+						if(~mode)
+							flag <= 6'b000_001;
+						else
+							flag <= 6'b000_100;
 						rd_addr <= 0;
 						wave_data1 <= 0;
 						wave_data2 <= 0;
