@@ -21,10 +21,10 @@
 
 
 module bpsk_demod1(
-	input 				clk_50m,//50mhz
 	input 				clk_32m,
 	input 				rst_n,
-	input 				en,      
+	input 				en,   
+	input				mode,
 	input 	   [9:0]	ad_data,    
 	output reg [9:0] 	demod_out,
 	output reg [7:0] 	freq        
@@ -33,16 +33,12 @@ module bpsk_demod1(
 wire clk_50k;
 wire clk_500;
 	
-reg signed [159:0] bpsk_wave_d;	
+reg signed [79:0] bpsk_wave_d;	
 reg signed [9:0] bpsk_wave;
 reg [3:0] delay_cnt;
 
 wire signed [9:0] bpsk_wave_180deg;
 wire signed [19:0] wave_high_t;
-wire signed [15:0] wave_high;
-
-wire signed [31:0] wave_low_t;
-wire signed [15:0] wave_low;
 
 wire fir_valid;
 
@@ -71,9 +67,9 @@ always@(posedge clk_32m or negedge rst_n)
 	if(~rst_n)
 		bpsk_wave_d <= 0;
 	else 
-		bpsk_wave_d <= {bpsk_wave[9:0] , bpsk_wave_d[159:10]};
+		bpsk_wave_d <= {bpsk_wave[9:0] , bpsk_wave_d[79:10]};
 		
-assign bpsk_wave_180deg = bpsk_wave_d[89:80];
+assign bpsk_wave_180deg = bpsk_wave_d[9:0];
 		
 mult_gen_10x10 m1_mult_gen_10x10 (
 	.CLK(clk_32m),  // input wire CLK
@@ -81,19 +77,6 @@ mult_gen_10x10 m1_mult_gen_10x10 (
 	.B(bpsk_wave_180deg),      // input wire [9 : 0] B
 	.P(wave_high_t)      // output wire [19 : 0] P
 );
-
-assign 	wave_high = wave_high_t<<<10;
-
-/* fir_low_15khz m2_fir_low_15khz (
-  .aclk(clk_50k),                              // input wire aclk
-  .s_axis_data_tvalid(en),  // input wire s_axis_data_tvalid
-  .s_axis_data_tready(),  // output wire s_axis_data_tready
-  .s_axis_data_tdata(wave_high),    // input wire [15 : 0] s_axis_data_tdata
-  .m_axis_data_tvalid(fir_valid),  // output wire m_axis_data_tvalid
-  .m_axis_data_tdata(wave_low_t)    // output wire [31 : 0] m_axis_data_tdata
-);
-
-assign wave_low = wave_low_t <<< 16; */
 
 always@(posedge clk_32m or negedge rst_n)
 	if(~rst_n)
@@ -126,6 +109,8 @@ always@(posedge clk_32m or negedge rst_n)
 always@(posedge clk_32m or negedge rst_n)
 	if(~rst_n)
 		demod_out <= 0;
+	else if(~mode)
+		demod_out <= ad_data;
 	else if(code)
 		demod_out <= 8'hff;
 	else 

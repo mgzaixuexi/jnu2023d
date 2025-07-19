@@ -26,6 +26,7 @@ module top(
     // ADC接口
     input  [9:0]   ad_data,       // ADC数据输入(10位)
     input          ad_otr,        // ADC输入电压超过量程标志
+	input		   ad_clk,
     
     // DA接口
     output         da_clk,        // DAC驱动时钟
@@ -55,6 +56,7 @@ wire             wr_done;         // RAM写完成
 wire [7:0]      rd_addr;         // RAM读地址
 wire [15:0]      rd_data;         // RAM读数据
 wire             wave_vaild;      // 波形有效信号
+wire			mode;				// 1：数字调制 0：模拟调制
 
 // 解调相关信号
 wire [2:0]       mod_type;        // 调制类型: 001-CW, 010-AM, 100-FM
@@ -67,6 +69,9 @@ wire [9:0]       demod_out_fm;       // 解调输出信号
 
 // 复位信号
 assign rst_n = sys_rst_n && locked;
+
+//ADC时钟
+assign ad_clk = (wave_vaild) ? clk_32m : clk_8192k;
 
 // PLL IP核
 clk_wiz_0 u_clk_wiz_0(
@@ -85,38 +90,38 @@ clk_wiz_1 u_clk_wiz_1(
     .clk_in1  (clk_32m)          // 系统输入时钟
 );
 // PLL IP核
-clk_wiz_2 u_clk_wiz_2(
+/* clk_wiz_2 u_clk_wiz_2(
     .clk_out1 (clk_30m),        // 30MHz采样时钟
 
     .clk_in1  (sys_clk)          // 系统输入时钟
-);
+); */
 //2MHz时钟(载波频率)、、注意因为PLL塞不下那么多时钟所以专门写个2m的时钟模块。
-clk_div_2m u_clk_div_2m (
+/* clk_div_2m u_clk_div_2m (
     .clk_32m (clk_32m),  // 输入50MHz时钟
     .rst_n   (rst_n),    // 全局复位
     .clk_2m  (clk_2m)    // 输出2MHz时钟
-);
+); */
 
 // 按键防抖模块
 key_debounce u_key_debounce(
     .clk(clk_50m),
-    .rst_n(sys_rst_n),
+    .rst_n(rst_n),
     .key(key),
     .key_value(key_value)
 );
 
-// FFT控制模块、、这个能不能去掉，以后换成每0.5s自启动一次。
+// FFT控制模块
 fft_ctrl u_fft_ctrl(
     .clk(clk_50m),
     .rst_n(rst_n),
-    .key(key_value[0]),          // 启动按键
+    .key(key_value[1:0]),          // 启动按键
     .fft_shutdown(fft_shutdown),
     .fft_valid(fft_valid)
 );
 
 // FFT IP核
 xfft_0 u_fft(
-    .aclk(clk_50m),
+    .aclk(clk_8192k),
     .aresetn(fft_valid & rst_n), // FFT重置信号
     .s_axis_config_tdata(8'd1),
     .s_axis_config_tvalid(1'b1),
@@ -158,8 +163,8 @@ data_modulus u_data_modulus(
 
 // RAM写控制模块
 ram_wr_ctrl u_ram_wr_ctrl(
-    .clk(clk_50m),
-    .rst_n(rst_n & key_value[0]), // 复位，接(rst_n & key[0])
+    .clk(clk_8192k),
+    .rst_n(rst_n & key_value[0] & key_value[1]), // 复位，接(rst_n & key[0])
     .data_modulus(data_modulus),
     .data_valid(data_valid),
     .wr_data(wr_data),
@@ -185,18 +190,20 @@ modulation_detect u_modulation_detect(
     .clk(clk_50m_180),
     .rst_n(rst_n),
     .en(wr_done),                // 使能信号
-    .key(key_value[1]),          // 模式选择按键
+    .key(key_value[1:0]),          // 模式选择按键
     .rd_data(rd_data),           // FFT取模数据
     .rd_addr(rd_addr),           // RAM地址
     .mod_type(mod_type),         // 调制类型
-    .wave_vaild(wave_vaild)      // 数据有效信号
+    .wave_vaild(wave_vaild),      // 数据有效信号
+	.mode(mode)					// 1：数字调制 0：模拟调制
 );
 
 // AM解调模块
 am_demod u_am_demod(
     .clk(clk_50m),
     .rst_n(rst_n),
-    .en(1'b1),      // AM模式使能
+    .en(mod_type[0]),      // AM模式使能
+	.mode(mode),			//1：数字调制 0：模拟调制
     .ad_data(ad_data),           // ADC输入数据
     .demod_out(demod_out_am),       // 解调输出
     .ma(mod_param1),             // 调幅系数
@@ -204,36 +211,36 @@ am_demod u_am_demod(
 );
 
 // FM解调模块
-// fm_demod u_fm_demod(
-//     .clk(clk_50m),
-//     .rst_n(rst_n),
-//     .en(mod_type[2]),      // FM模式使能
-//     .ad_data(ad_data),           // ADC输入数据
-//     .demod_out(demod_out_fm),       // 解调输出
-//     .mf(mod_param1),             // 调频系数
-//     .delta_f(mod_param2),        // 最大频偏
-//     .freq(mod_freq)              // 调制频率
-// );
-
-// CW解调模块
-// fm_demod u_fm_demod(
-//     .clk(clk_50m),
-//     .rst_n(rst_n),
-//     .en(mod_type[0]),      // FM模式使能
-//     .ad_data(ad_data),           // ADC输入数据
-//     .demod_out(demod_out_cw),       // 解调输出
-//     .freq(mod_freq)              // 调制频率
-// );
+fm_demod u_fm_demod(
+    .clk(clk_50m),
+    .rst_n(rst_n),
+    .en(mod_type[1]),      // FM模式使能
+	.mode(mode),		//1：数字调制 0：模拟调制
+	.ad_data(ad_data),           // ADC输入数据
+    .demod_out(demod_out_fm),       // 解调输出
+    .mf(mod_param1),             // 调频系数
+    .delta_f(mod_param2),        // 最大频偏
+    .freq(mod_freq)              // 调制频率
+ );
+// 2PSK解调模块
+bpsk_demod1 u_bpsk_demod(
+	.clk_32m(clk_32m),
+	.rst_n(rst_n),
+	.en(mod_type[2]),// 2PSK模式使能
+	.mode(mode),		//1：数字调制 0：模拟调制
+	.ad_data(ad_data),   
+	.demod_out(demod_out_cw),
+	.freq(mod_freq)       
+);
 
 // DA输出控制
-assign da_clk = clk_2m;          // DAC时钟使用载波频率
-// assign da_data = (mod_type[0]) ? demod_out_cw : // CW模式输出中间值
-//                  (mod_type[1]) ? demod_out_am : demod_out_fm
-assign da_data = demod_out_am;
+assign da_clk = clk_32m;          // DAC时钟使用采样频率
+assign da_data = (mod_type[2]) ? demod_out_cw : // CW模式输出中间值
+                 (mod_type[1]) ? demod_out_fm : demod_out_am;
 // 数码管显示模块
 seg_led u_seg_led(
-    .sys_clk(sys_clk),
-    .sys_rst_n(sys_rst_n),
+    .sys_clk(clk_50m),
+    .sys_rst_n(rst_n),
 	.num1(mod_type),
 	.num2(mod_param1),
 	.num3(mod_param2),
