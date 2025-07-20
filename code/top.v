@@ -30,11 +30,11 @@ module top(
     
     // DA接口
     output         da_clk,        // DAC驱动时钟
-    output [9:0]  da_data,       // DAC数据输出(10位)
+    output [9:0]   da_data,       // DAC数据输出(10位)
     
     // 数码管接口
-    output [4:0]  seg_sel,       // 数码管位选
-    output [7:0]  seg_led        // 数码管段选
+    output [4:0]   seg_sel,       // 数码管位选
+    output [7:0]   seg_led        // 数码管段选
 );
 
 // 内部信号定义
@@ -193,8 +193,8 @@ modulation_detect u_modulation_detect(
     .key(key_value[1:0]),          // 模式选择按键
     .rd_data(rd_data),           // FFT取模数据
     .rd_addr(rd_addr),           // RAM地址
-    .mod_type(mod_type),         // 调制类型
-    .wave_vaild(wave_vaild),      // 数据有效信号
+    .mode_type(mod_type),         // 调制类型
+    .valid(wave_vaild),      // 数据有效信号
 	.mode(mode)					// 1：数字调制 0：模拟调制
 );
 
@@ -228,20 +228,21 @@ bpsk_demod1 u_bpsk_demod(
 	.rst_n(rst_n),
 	.en(mod_type[2]),// 2PSK模式使能
 	.mode(mode),		//1：数字调制 0：模拟调制
-	.ad_data(ad_data),   
-	.demod_out(demod_out_cw),
-	.freq(mod_freq)       
+	.ad_data(ad_data),   		// ADC输入数据
+	.demod_out(demod_out_cw),      // 解调输出
+	.freq(mod_freq)       	// 调制频率
 );
 
 // DA输出控制
 assign da_clk = clk_32m;          // DAC时钟使用采样频率
 assign da_data = (mod_type[2]) ? demod_out_cw : // CW模式输出中间值
-                 (mod_type[1]) ? demod_out_fm : demod_out_am;
+                 (mod_type[1]) ? demod_out_fm : 
+				 (mod_type[0]) ? demod_out_am : 0;
 // 数码管显示模块
 seg_led u_seg_led(
     .sys_clk(clk_50m),
     .sys_rst_n(rst_n),
-	.num1(mod_type),
+	.num1(mod_freq),
 	.num2(mod_param1),
 	.num3(mod_param2),
     .seg_sel(seg_sel),

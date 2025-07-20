@@ -109,12 +109,16 @@ always@(posedge clk_32m or negedge rst_n)
 always@(posedge clk_32m or negedge rst_n)
 	if(~rst_n)
 		demod_out <= 0;
-	else if(~mode)
-		demod_out <= ad_data;
-	else if(code)
-		demod_out <= 8'hff;
-	else 
-		demod_out <= 0;
+	else if(en)
+		if(~mode)
+			demod_out <= ad_data;
+		else begin
+			if(code)
+				demod_out <= 10'h3ff;
+			else 
+				demod_out <= 0;
+			end
+	else demod_out <= 0;
 	
 always@(posedge clk_32m or negedge rst_n)
 	if(~rst_n)begin
