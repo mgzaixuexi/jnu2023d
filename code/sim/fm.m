@@ -1,50 +1,43 @@
+% FM调制波生成并保存二进制数据到txt文件
 % 参数设置
-Fs = 8.192e6;       % 采样频率8.192MHz
-Fc = 2e6;           % 载波频率2MHz
-Fm = 5e3;           % 调制信号频率5kHz
-Vpp = 0.1;          % 载波峰峰值100mV（幅值50mV）
-N = 81920;          % 采样点数
-bits = 10;          % 10位量化
-beta = 5;           % 调制指数（频偏比）
+fs = 32e6;       % 采样频率 8MHz
+fc = 2e6;       % 载波频率 2MHz
+fm = 3e3;       % 调制频率 5kHz
+duration = 0.01; % 信号持续时间 10ms
+bits = 10;      % 输出位数
 
-% 生成时间序列
-t = (0:N-1)/Fs;
+% 时间向量
+t = 0:1/fs:duration-1/fs;
 
-% 生成调制信号（频率调制）
-mod_signal = sin(2*pi*Fm*t);       % 调制信号（范围[-1,1]）
+% 调制信号
+mod_signal = sin(2*pi*fm*t);
 
-% 生成FM信号（频率调制公式）
-% 积分调制信号得到相位偏移：∫mod_signal dt = -cos(2πFm t)/(2πFm)
-phase_integral = -cos(2*pi*Fm*t) / (2*pi*Fm);
-FM_signal = Vpp/2 * sin(2*pi*Fc*t + beta * phase_integral); % 频偏=β*Fm
+% 调制指数/频偏
+beta = 5;
+f_dev = beta * fm;
 
-% 归一化到[0,1]范围（适配10位量化）
-FM_normalized = (FM_signal - min(FM_signal)) / (max(FM_signal) - min(FM_signal));
+% FM调制
+fm_signal = cos(2*pi*fc*t + 2*pi*f_dev*cumsum(mod_signal)/fs);
 
-% 量化为10位无符号整数（0-1023）
-FM_quantized = uint16(round(FM_normalized * (2^bits - 1)));
+% 量化为10位无符号二进制 (0-1023)
+quantized = round((fm_signal + 1) * (2^bits-1)/2);
 
-% 写入文件（二进制字符串，每行10位）
-fid = fopen('FM_signal_2MHz_5kHz.txt', 'w');
-for i = 1:N
-    fprintf(fid, '%s\n', dec2bin(FM_quantized(i), bits));
+% 转换为二进制字符串
+binary_out = dec2bin(quantized, bits);
+
+% 保存到txt文件
+filename = 'fm_modulation_binary_data.txt';
+fid = fopen(filename, 'w');
+
+
+% 写入二进制数据
+for i = 1:length(binary_out)
+    fprintf(fid, '%s\n', binary_out(i,:));
 end
+
 fclose(fid);
+disp(['二进制数据已保存到文件: ' filename]);
 
-% 绘制波形（前2000点）
-figure;
-subplot(3,1,1);
-plot(t(1:2000), mod_signal(1:2000));
-title('调制信号 (sin(2πFm t))');
-xlabel('时间（秒）'); ylabel('幅值');
-
-subplot(3,1,2);
-plot(t(1:2000), phase_integral(1:2000));
-title('积分相位偏移 (∫mod\_signal dt)');
-xlabel('时间（秒）'); ylabel('相位（rad）');
-
-subplot(3,1,3);
-plot(t(1:2000), FM_signal(1:2000));
-title('FM调制信号 (A_c \cdot sin(2πFc t + β∫mod\_signal dt))');
-xlabel('时间（秒）'); ylabel('幅值（V）');
-grid on;
+% 显示部分结果
+disp('前10个样本的10位二进制值:');
+disp(binary_out(1:10,:));

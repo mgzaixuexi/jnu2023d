@@ -31,7 +31,19 @@ module fm_demod_tb;
     real mod_phase = 0;
     integer file_out;
     reg clk_50k;
-    reg clk_8m;
+    wire clk_32m;
+    wire clk_8m;
+      clk_wiz_0 instance_name
+   (
+    // Clock out ports
+    .clk_out1(clk_32m),     // output clk_out1
+    .clk_out2(clk_8m),     // output clk_out2
+    // Status and control signals
+    .reset(~rst_n), // input reset
+    .locked(locked),       // output locked
+   // Clock in ports
+    .clk_in1(clk_50m));      // input clk_in1
+
     // 时钟生成
     initial begin
         clk_50m = 0;
@@ -49,39 +61,21 @@ module fm_demod_tb;
         clk_100m = 0;
         forever #(CLK_PERIOD/4) clk_100m = ~clk_100m;
     end
-    // 时钟生成
-    initial begin
-        clk_8m = 0;
-        forever #(62) clk_8m = ~clk_8m;
-    end
-//ROM存储波形
-rom_50x10b u_rom_50x10b1 (
-    .clka     (clk_100m),  // input wire clka
-    .addra    (rd_addr1 ),  // input wire [5 : 0] addra
-    .douta    (rd_data1 )   // output wire [9 : 0] douta
-    );
+    // // 时钟生成
+    // initial begin
+    //     clk_32m = 0;
+    //     forever #(15) clk_32m = ~clk_32m;
+    // end
 
-    //ROM存储波形
-rom_50x10b1 u_rom_50x10b2 (
-    .clka     (clk_100m),  // input wire clka
-    .addra    (rd_addr2 ),  // input wire [5 : 0] addra
-    .douta    (rd_data2 )   // output wire [9 : 0] douta
-    );
 reg clk_8192k;
 reg clk_81920k;
 reg clk_40960k;
+reg clk_320k;
     // 实例化被测设�?
     fm_demod_n u_fm_demod (
-    . clk_8192k(clk_8192k),         // 50MHz系统时钟
-    . clk_81920k(clk_81920k),
-    . clk_8m(clk_8m),
-    . clk_50k(clk_50k),
+    . clk_32m(clk_32m),
     . rst_n(rst_n),           // 异步低电平复�?
     .  ad_data(ad_data),  // FM输入信号
-    . rd_data1(rd_data1),
-    .rd_data2(rd_data2),
-    . rd_addr1(rd_addr1),
-    . rd_addr2(rd_addr2),
 
     .  demod_out(demod_out),  // 解调输出信号
     . mf(mf),  // 调频系数(调制指数)
@@ -90,7 +84,7 @@ reg clk_40960k;
     );
 
     // 读取文件中的数据
-reg [9:0] mem [0:8192];
+
 integer i;
 reg file_loaded = 0;     // 文件加载完成标志
 
@@ -109,20 +103,41 @@ initial begin
     clk_40960k = 0;
     forever #12 clk_40960k = ~clk_40960k;  // 半周�?=61ns
 end
+
+reg [5:0]clk_cnt;
+always @(posedge clk_32m) begin
+    if(~rst_n) 
+        begin
+            clk_320k<=0;
+            clk_cnt<=0;
+        end
+    else 
+        begin
+            clk_cnt<=clk_cnt+1;
+            if(clk_cnt==50-1)
+                begin
+                    clk_320k<=~clk_320k;
+                    clk_cnt<=0;
+                end
+
+        end
+end
+reg [9:0] mem [0:320000];
     // 复位生成
     initial begin
         rst_n = 0;
         #100;
         rst_n = 1;
     // 读取数据文件（注意文件格式）
-    $readmemb("E:/diansai/jnu2023d/code/sim/FM_signal_2MHz_5kHz.txt", mem);
+    $readmemb("E:/diansai/jnu2023d/code/sim/fm_modulation_binary_data.txt", mem); //读取FM数据
+    // $readmemb("E:/diansai/jnu2023d/code/sim/fsk_10bit_binary.txt", mem); //读取FSK数据
     file_loaded = 1;     // 文件加载完成标志
     // 读取测试数据文件
     if(file_loaded)begin
-        for (i = 0; i < 8192-1; ) begin
-            @(posedge clk_81920k);
+        for (i = 0; i <= 320000-1; ) begin
+            @(posedge clk_32m);
                 ad_data <= mem[i];
-                if(i==8191-1) i<=0;else i<= i+1;
+                if(i==320000-1) i<=0;else i<= i+1;
         end
     end
 
