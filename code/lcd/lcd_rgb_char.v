@@ -20,6 +20,8 @@ module  lcd_rgb_char(
     input              sys_rst_n ,
 	
 	input      [31:0]  data      ,
+    input      [7:0 ]  ad_data   ,
+    input              ad_clk,
 	//RGB LCD接口 
     output             lcd_hs    , //LCD 行同步信号
     output             lcd_vs    , //LCD 场同步信号
@@ -88,6 +90,8 @@ binary2bcd u_binary2bcd_y(
 lcd_display  u_lcd_display(          
     .lcd_pclk       (lcd_pclk    ),
     .sys_rst_n      (sys_rst_n   ),
+    .ad_clk         (ad_clk ),
+    .ad_data        (ad_data     ),
     .data_in        (data        ),
     .bcd_data       ({bcd_data_x,bcd_data_y}),
     .pixel_xpos     (pixel_xpos_w),

@@ -19,8 +19,6 @@
 module lcd_display(
     input             lcd_pclk,                 //lcd驱动时钟
     input             sys_rst_n,                //复位信号
-    input      [7:0]  ad_data,
-    input             ad_clk,
     input      [31:0] data_in  ,
     input      [31:0] bcd_data ,
     
@@ -44,10 +42,6 @@ localparam Coral  = 24'hFF7F50; //背景色，珊瑚红
 localparam Red    = 24'hFF0000; //背景色，红色
 localparam Tangerine = 24'hF28500; //背景色，橘色
 localparam Ivy_Green = 24'h36BF36; //背景色，常春藤绿
-localparam Aquamarine= 24'h7FFFD4;    //背景色，碧蓝色
-localparam Turquoise = 24'h30D5C8;    //背景色，绿松石色
-localparam Azure     = 24'hF28500; //背景色，湛蓝
-localparam Lavender = 24'h36BF36; //背景色，薰衣草紫
 
 // 按钮参数定义
 // 按钮参数定义（基于800x480屏幕）
@@ -95,28 +89,12 @@ localparam DIGIT_Y = REGION1_Y;
 
 
 // 按钮和标签颜色
-localparam BUTTON_COLOR = Ivy_Green;   // 按钮绿色
+localparam BUTTON_COLOR = Ivy_Green;   // 按钮蓝色
 localparam LABEL_COLOR = BLACK;    // 标签黑色
 localparam BACK_COLOR = Coral;    // 背景颜色珊瑚红
 localparam Char_COLOR = BLACK;    // 字符颜色黑色
 localparam REGION_COLOR = Red;         // 区域背景色
 localparam REGION_LABEL_COLOR = BLACK;  // 区域标签颜色
-
-// 波形显示区域参数定义
-localparam WAVE_AREA_X = 100;         // 保持原样（定位用）
-localparam WAVE_AREA_Y = 42;          // Y标签上面，字符下面
-localparam WAVE_AREA_WIDTH = 512;     // 2^9
-localparam WAVE_AREA_HEIGHT = 256;    // 2^8
-localparam GRID_COLOR = Azure;          // 网格线颜色
-localparam WAVE_COLOR = Lavender;          // 波形颜色
-// 网格线绘制优化
-wire [7:0] rel_y = pixel_ypos - WAVE_AREA_Y;  // 自动8位截取
-wire [8:0] rel_x = pixel_xpos - WAVE_AREA_X;  // 9位（0-511）
-// 水平网格线（每32像素一条，使用位操作）
-wire h_grid_line = (rel_y[4:0] == 0); 
-// 垂直网格线（每64像素一条）
-wire v_grid_line = (rel_x[5:0] == 0);
-
 
 //按键监测
 // 新增触摸点位置检测逻辑
@@ -410,19 +388,6 @@ always @(posedge lcd_pclk or negedge sys_rst_n) begin
                     pixel_data <= REGION_LABEL_COLOR;
             end
         end
-        // 添加：在区域右侧显示数字"1"或"0"
-        else if ((pixel_xpos >= DIGIT_X2) && (pixel_xpos < DIGIT_X2 + CHAR_WIDTH_BUTTON)
-            && (pixel_ypos >= DIGIT_Y) && (pixel_ypos < DIGIT_Y + CHAR_HEIGHT)) begin
-            if (button2_active) begin
-                if (char[1][(CHAR_HEIGHT + DIGIT_Y - pixel_ypos) * 16 - 
-                        ((pixel_xpos - DIGIT_X2) % CHAR_WIDTH_BUTTON) - 1]) 
-                    pixel_data <= REGION_LABEL_COLOR;
-            end else begin
-                if (char[0][(CHAR_HEIGHT + DIGIT_Y - pixel_ypos) * 16 - 
-                        ((pixel_xpos - DIGIT_X2) % CHAR_WIDTH_BUTTON) - 1]) 
-                    pixel_data <= REGION_LABEL_COLOR;
-            end
-        end        
     end
     
     // 区域3（按钮3上方）显示Y3
@@ -447,61 +412,15 @@ always @(posedge lcd_pclk or negedge sys_rst_n) begin
                     pixel_data <= REGION_LABEL_COLOR;
             end
         end
-        // 添加：在区域右侧显示数字"1"或"0"
-        else if ((pixel_xpos >= DIGIT_X3) && (pixel_xpos < DIGIT_X3 + CHAR_WIDTH_BUTTON)
-            && (pixel_ypos >= DIGIT_Y) && (pixel_ypos < DIGIT_Y + CHAR_HEIGHT)) begin
-            if (button3_active) begin
-                if (char[1][(CHAR_HEIGHT + DIGIT_Y - pixel_ypos) * 16 - 
-                        ((pixel_xpos - DIGIT_X3) % CHAR_WIDTH_BUTTON) - 1]) 
-                    pixel_data <= REGION_LABEL_COLOR;
-            end else begin
-                if (char[0][(CHAR_HEIGHT + DIGIT_Y - pixel_ypos) * 16 - 
-                        ((pixel_xpos - DIGIT_X3) % CHAR_WIDTH_BUTTON) - 1]) 
-                    pixel_data <= REGION_LABEL_COLOR;
-            end
-        end
-    end
-    // 波形显示区域（添加在原有条件判断之后，else之前）
-    else if((pixel_xpos >= WAVE_AREA_X) && (pixel_xpos < WAVE_AREA_X + WAVE_AREA_WIDTH) &&
-           (pixel_ypos >= WAVE_AREA_Y) && (pixel_ypos < WAVE_AREA_Y + WAVE_AREA_HEIGHT)) begin
-        pixel_data <= h_grid_line || v_grid_line ? GRID_COLOR : 
-                    (rel_y == 128) ? WAVE_COLOR :  // 中心线示例
-                    Snow;
     end
 
-
-
-
-
-
-    //背景颜色
     else begin
         pixel_data <= BACK_COLOR;              //绘制屏幕背景为白色
     end
 end
-
-
-lcd_ram u_lcd_ram( 
-    .clka(ad_clk),
-    .wea (),
-    .addra(),
-    .dina (ad_data),
-    .clkb (lcd_pclk),
-    .addrb(),
-    .doutb()
-  );
-
 endmodule 
 //这份代码左上角前四个数字动态显示触碰屏幕位置的横坐标，然后是字符X，然后是3个数字动态显示触碰屏幕位置的纵坐标，然后是字符Y。
-//屏幕下面还设置三个按钮X1,X2,X3，按钮正上方三个的区域，对应第一个区域左边标上Y1，区域右边标上数字1.第二个区域左边标上Y2，第三个区域左边标上Y2，
-//且Y1、Y2、Y3区域的右边那个1，是动态的0或1，1代表触碰屏幕位置在按钮X1位置。否则为0.
-//往上在Y1、Y2、Y3区域上面划分出一片网格区域用于显示信号波形。
-//显示信号波形的设想为：采用ram来存储信号波形数据，本次试验中波形数据和网格图的高度都为256，可以刚好对应。深度使用512，用于跟网格区域对应。
-//ad_data随着ad_clk不断写入ram，而lcd随着pclk不断读取并显示波形数据。
-//问题一：lcd显示是从左上往右下显示的，而波形数据可能会变大，对应位置往上，如果等到下一帧再显示那就太慢了。
-//解决思路：将pixel_xpos与ram读取地址绑定，就可以实时比较对应ram波形数据是否应该显示在对应位置。比如在第255行读到位置1对应地址1的数据为10，就先不显示地址1数据，而位置100对应地址100的数据恰好为255，就可以先显示位置100对应地址100的数据而不用按顺序显示。
-//问题二:lcd显示是从左上往右下显示的，但是波形数据越大，应该显示的位置反而朝上。
-//解决思路：使用类似v_disp - ad_data - WAVE_AREA_Y - WAVE_AREA_HEIGHT,来表示，这样ad_data变大，对应位置也就往上，符合预期。v_disp表示lcd屏幕高度，为480.
-//现在要求完成信号波形显示。
+//这份代码还设置三个按钮X1,X2,X3，按钮正上方三个的区域，对应第一个区域左边标上Y1，区域右边标上数字1.第二个区域左边标上Y2，第三个区域左边标上Y2，
+//现在要求第一个区域的右边那个1，希望变成动态的0或1，1代表触碰屏幕位置在按钮X1位置。否则为0.
 //注意，输入变量data_in是bcd_data在bcd变换之前的值，data_in前16位代表屏幕位置的横坐标，后16位触碰屏幕位置的纵坐标，显示屏的尺寸是800*480.
 //请编写代码，注意代码还是放在lcd_display里面，但是希望显示的时候只显示你这次新加（或删改）的代码内容
