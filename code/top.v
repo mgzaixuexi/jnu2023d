@@ -217,8 +217,8 @@ am_demod u_am_demod(
 );
 
 // FM解调模块
-fm_demod u_fm_demod(
-    .clk_32m(clk_32m),
+fm_demod_new u_fm_demod(
+    .clk(clk_32m),
     .rst_n(rst_n),
     .en(mod_type[1]),      // FM模式使能
 	.mode(mode),		//1：数字调制 0：模拟调制
