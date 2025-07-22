@@ -23,8 +23,8 @@
 module key_debounce(
     input clk,
     input rst_n,
-    input [3:0] key,
-    output reg [3:0] key_value
+    input [2:0] key,
+    output reg [2:0] key_value
     );
     
 parameter waittime = 1_000_000;
@@ -52,9 +52,9 @@ always@ (posedge clk or negedge rst_n)
     
 always@ (posedge clk or negedge rst_n)
     if(~rst_n)
-    key_value<=4'b1111;
+    key_value<=3'b111;
     else if(cnt==waittime-1)
     key_value<=key;
-    else key_value<=4'b1111;
+    else key_value<=3'b111;
     
 endmodule

@@ -3,7 +3,7 @@ module fm_demod (
     input rst_n,           // 异步低电平复位
     input [9:0] ad_data,  // FM输入信号
     input mode,
-    
+    input en,
     output [9:0] demod_out,  // 解调输出信号
     output reg [7:0] mf,  // 调频系数(调制指数)
     output reg [15:0] delta_f,     // 最大频偏(Hz)
@@ -54,19 +54,19 @@ assign ad_mult_filter_f=ad_mult_filter[37:16];
 
 fir_compiler_0 u_fir_compiler_03 (
   .aclk(clk_32m),                              // input wire aclk
-  .s_axis_data_tvalid(1),  // input wire s_axis_data_tvalid
-  .s_axis_data_tready(s_axis_data_tready),  // output wire s_axis_data_tready
+  .s_axis_data_tvalid(en),  // input wire s_axis_data_tvalid
+  .s_axis_data_tready(),  // output wire s_axis_data_tready
   .s_axis_data_tdata(ad_mult),    // input wire [23 : 0] s_axis_data_tdata
-  .m_axis_data_tvalid(m_axis_data_tvalid),  // output wire m_axis_data_tvalid
+  .m_axis_data_tvalid(),  // output wire m_axis_data_tvalid
   .m_axis_data_tdata(ad_mult_filter)    // output wire [39 : 0] m_axis_data_tdata
 );
 
 fir_compiler_0 u_fir_compiler_04 (
   .aclk(clk_32m),                              // input wire aclk
-  .s_axis_data_tvalid(1),  // input wire s_axis_data_tvalid
-  .s_axis_data_tready(s_axis_data_tready),  // output wire s_axis_data_tready
+  .s_axis_data_tvalid(en),  // input wire s_axis_data_tvalid
+  .s_axis_data_tready(),  // output wire s_axis_data_tready
   .s_axis_data_tdata(ad_mult_filter_f),    // input wire [23 : 0] s_axis_data_tdata
-  .m_axis_data_tvalid(m_axis_data_tvalid),  // output wire m_axis_data_tvalid
+  .m_axis_data_tvalid(),  // output wire m_axis_data_tvalid
   .m_axis_data_tdata(ad_mult_filter_out)    // output wire [39 : 0] m_axis_data_tdata
 );
 

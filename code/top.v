@@ -26,7 +26,7 @@ module top(
     // ADC接口
     input  [9:0]   ad_data,       // ADC数据输入(10位)
     input          ad_otr,        // ADC输入电压超过量程标志
-	input		   ad_clk,
+	output		   ad_clk,
     
     // DA接口
     output         da_clk,        // DAC驱动时钟
@@ -38,12 +38,11 @@ module top(
 );
 
 // 内部信号定义
-wire             clk_100m;        // 100MHz时钟
 wire             clk_50m;         // 50MHz时钟
 wire             clk_32m;         // 32MHz时钟
-wire             clk_32m_120;         // 32MHz时钟
 wire             clk_2m;          // 2MHz时钟(载波频率)
-wire             locked;          // PLL锁定信号
+wire             locked1;          // PLL锁定信号1
+wire             locked2;          // PLL锁定信号1
 wire             rst_n;           // 全局复位信号
 wire [2:0]       key_value;       // 按键值（防抖后）
 wire [15:0]      data_modulus;    // FFT取模结果
@@ -68,25 +67,26 @@ wire [9:0]       demod_out_am;       // 解调输出信号
 wire [9:0]       demod_out_fm;       // 解调输出信号
 
 // 复位信号
-assign rst_n = sys_rst_n && locked;
+assign rst_n = sys_rst_n & locked1 & locked2;
 
 //ADC时钟
 assign ad_clk = (wave_vaild) ? clk_32m : clk_8192k;
+//assign ad_clk = clk_32m;
 
 // PLL IP核
 clk_wiz_0 u_clk_wiz_0(
-    .clk_out1 (clk_100m),        // 
+    .clk_out1 (clk_32m),        // 32MHz时钟
     .clk_out2 (clk_50m),         // 50MHz时钟
     .clk_out3 (clk_50m_180),     // 50MHz时钟相移180
-    .clk_out4 (clk_32m),         // 32MHz时钟
-
-    .locked   (locked),          // PLL锁定信号
+	.reset	  (~sys_rst_n),
+    .locked   (locked1),          // PLL锁定信号
     .clk_in1  (sys_clk)          // 系统输入时钟
 );
 // PLL IP核
 clk_wiz_1 u_clk_wiz_1(
     .clk_out1 (clk_8192k),        // 8192kHz采样时钟
-
+	.reset	  (~sys_rst_n),
+	.locked	  (locked2),
     .clk_in1  (clk_32m)          // 系统输入时钟
 );
 // PLL IP核
@@ -119,20 +119,24 @@ fft_ctrl u_fft_ctrl(
     .fft_valid(fft_valid)
 );
 
+wire s_axis_config_tready;
+wire s_axis_data_tlast;
+wire s_axis_data_tready;
+wire [32:0] fft_m_data_tdata;
 // FFT IP核
 xfft_0 u_fft(
     .aclk(clk_8192k),
     .aresetn(fft_valid & rst_n), // FFT重置信号
     .s_axis_config_tdata(8'd1),
     .s_axis_config_tvalid(1'b1),
-    .s_axis_config_tready(),     // 悬空
+    .s_axis_config_tready(s_axis_config_tready),     // 悬空
     
-    .s_axis_data_tdata({6'b0, ad_data}), // 输入数据(10位ADC数据)
+    .s_axis_data_tdata({22'b0, ad_data}), // 输入数据(10位ADC数据)
     .s_axis_data_tvalid(1'b1),
-    .s_axis_data_tready(),
-    .s_axis_data_tlast(),
+    .s_axis_data_tready(s_axis_data_tready),
+    .s_axis_data_tlast(s_axis_data_tlast),
     
-    .m_axis_data_tdata(),
+    .m_axis_data_tdata(fft_m_data_tdata),
     .m_axis_data_tuser(),
     .m_axis_data_tvalid(fft_m_data_tvalid),
     .m_axis_data_tready(1'b1),
@@ -149,7 +153,7 @@ xfft_0 u_fft(
     .event_data_in_channel_halt(),
     .event_data_out_channel_halt()
 );
-wire [32:0] fft_m_data_tdata;
+
 // 数据取模模块
 data_modulus u_data_modulus(
     .clk(clk_50m),
@@ -157,6 +161,8 @@ data_modulus u_data_modulus(
     .source_real(fft_m_data_tdata[15:0]),   // 实部
     .source_imag(fft_m_data_tdata[31:16]),  // 虚部
     .source_valid(fft_m_data_tvalid),
+	.data_eop(),
+	.source_eop(1),
     .data_modulus(data_modulus),
     .data_valid(data_valid)
 );
@@ -176,7 +182,7 @@ ram_wr_ctrl u_ram_wr_ctrl(
 
 // RAM IP核 (256x16)
 ram_256x16 u_ram_256x16 (
-    .clka(clk_50m),              // FFT时钟
+    .clka(clk_8192k),              // FFT时钟
     .wea(wr_en),                 // 写使能
     .addra(wr_addr),             // 写地址
     .dina(wr_data),              // 写数据
@@ -200,10 +206,10 @@ modulation_detect u_modulation_detect(
 
 // AM解调模块
 am_demod u_am_demod(
-    .clk(clk_50m),
+    .clk(clk_8192k),
     .rst_n(rst_n),
     .en(mod_type[0]),      // AM模式使能
-	.mode(mode),			//1：数字调制 0：模拟调制
+	//.mode(mode),			//1：数字调制 0：模拟调制
     .ad_data(ad_data),           // ADC输入数据
     .demod_out(demod_out_am),       // 解调输出
     .ma(mod_param1),             // 调幅系数
@@ -212,7 +218,7 @@ am_demod u_am_demod(
 
 // FM解调模块
 fm_demod u_fm_demod(
-    .clk(clk_50m),
+    .clk_32m(clk_32m),
     .rst_n(rst_n),
     .en(mod_type[1]),      // FM模式使能
 	.mode(mode),		//1：数字调制 0：模拟调制
@@ -220,7 +226,7 @@ fm_demod u_fm_demod(
     .demod_out(demod_out_fm),       // 解调输出
     .mf(mod_param1),             // 调频系数
     .delta_f(mod_param2),        // 最大频偏
-    .freq(mod_freq)              // 调制频率
+    .mod_freq(mod_freq)              // 调制频率
  );
 // 2PSK解调模块
 bpsk_demod1 u_bpsk_demod(
@@ -242,9 +248,9 @@ assign da_data = (mod_type[2]) ? demod_out_cw : // CW模式输出中间值
 seg_led u_seg_led(
     .sys_clk(clk_50m),
     .sys_rst_n(rst_n),
-	.num1(mod_freq),
-	.num2(mod_param1),
-	.num3(mod_param2),
+	.num1(mod_param1),
+	.num2(mod_param2),
+	.num3(mod_type),
     .seg_sel(seg_sel),
     .seg_led(seg_led)
 );

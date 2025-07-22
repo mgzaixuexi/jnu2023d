@@ -50,13 +50,6 @@ reg [12:0] freq_cnt_t;
 reg [12:0] freq_cnt;
 reg flag;
 
-sample_clk_div m0_sample_clk_div(
-	.clk(clk),
-	.rst_n(rst_n),
-	.clk_50k(clk_50k),
-	.clk_500(clk_500)
-);
-
 always@(posedge clk_32m or negedge rst_n)
 	if(~rst_n)
 		bpsk_wave <= 0;

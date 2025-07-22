@@ -1,4 +1,7 @@
-set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets D0_clk_50m_xout/inst/clk_in1_clk_50MHz_Xout] 
+#####set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets D0_clk_50m_xout/inst/clk_in1_clk_50MHz_Xout] 
+# 在.xdc文件中添加以下约束
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets u_clk_wiz_0/inst/clk_in1_clk_wiz_0]
+create_clock -period 20.000 -name sys_clk [get_ports sys_clk]
 
 set_property -dict {PACKAGE_PIN C2 IOSTANDARD LVCMOS33} [get_ports sys_clk]
  
