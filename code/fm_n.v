@@ -24,8 +24,7 @@ wire signed [10:0]demod_out_sign;
 wire [39:0]ad_mult_filter_out; 
 
 assign ad_mult_filter_small = ad_mult_filter_out[37:16];
-assign demod_out_1 = -(ad_mult_filter_small[21:10]); 
-assign demod_out_sign = demod_out_1*5;     //FSK的时候会超范围 需要修改
+assign demod_out_sign = -(ad_mult_filter_small[21:10]); 
 assign demod_out = demod_out_sign+512;     //FSK的时候会超范围 需要修改
  
 
