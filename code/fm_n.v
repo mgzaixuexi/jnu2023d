@@ -72,7 +72,7 @@ fir_compiler_0 u_fir_compiler_04 (
 
 
      wire [15:0] F;       // 调制信号频率(Hz)
-
+    
     // 线性拟合参数 (根据实际校准数据调整)
     parameter a2 = 32'd1000;   // 斜率系数(Hz/count)
     parameter b2 = 32'd0;      // 截距(Hz)
@@ -115,15 +115,14 @@ fir_compiler_0 u_fir_compiler_04 (
             delta_f <= 16'b0;
             mf <= 16'b0;
         end else begin
+            mf<= ((vpp>>10)*1000)/(6*F);  //F单位为kHz
             // Δfmax = a2 * Vpp + b2
             // 使用32位计算防止溢出
-            delta_f <= (a2 * vpp + b2);
+            delta_f <= mf*F;  //单位为kHz
             
-            // mf = Δfmax / F
-            if (F != 0) mf <= delta_f / F;
-            else mf <= 16'b0;  // 避免除以零
         end
     end
+
 
 
 endmodule
