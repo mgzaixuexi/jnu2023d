@@ -60,6 +60,56 @@ always @(posedge clk or negedge rst_n) begin
     end
 end
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+////////////全波整流和滤波
+//调制深度通常为已调波的最大振幅与最小振幅之差对载波最大振幅与最小振幅之和的比。就是生成AM波包络的最大值与最小值之差除以最大值与最小值之和。
+//挪到中间，并进行全波整流,
+// 中间信号
+reg signed [15:0] centered; // 中心偏移后的信号（ad_data - 512）
+reg [15:0] rectified;
+always @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+        centered <= 16'sd0;
+        rectified <= 16'sd0;
+    end else begin
+        // 1. 将10位无符号ADC数据转换为16位有符号数（减去512）
+        centered <= {6'b0, ad_data} - 16'd512;
+        
+        // 2. 全波整流（取绝对值）
+        if (centered < 0) begin
+            rectified <= -centered; // 负值取反
+        end else begin
+            rectified <= centered;  // 正值保持不变
+        end
+    end
+end
+
+wire [39:0] filtered_signal;
+wire s_axis_dalta_tready;
+wire m_axis_data_tvalid;
+
+fir_compiler_1 u_fir_compiler_0 (             //低通滤波
+  .aclk(clk),                              // input wire aclk
+  .s_axis_data_tvalid(1),  // input wire s_axis_data_tvalid
+  .s_axis_data_tready(s_axis_dalta_tready),  // output wire s_axis_data_tready
+  .s_axis_data_tdata(rectified),    // input wire [15 : 0] s_axis_data_tdata
+  .m_axis_data_tvalid(m_axis_data_tvalid),  // output wire m_axis_data_tvalid
+  .m_axis_data_tdata(filtered_signal)    // output wire [39 : 0] m_axis_data_tdata
+);
+
+
 // 实例化ASK解调模块
 ask_demod u_ask_demod(
     .clk(clk),
@@ -67,10 +117,15 @@ ask_demod u_ask_demod(
     .rst_n(rst_n),
     .en(ask_en),
     .ad_data(ad_data),
+
     .bit_out(bit_out),
     .bit_valid(bit_valid),
     .bit_rate_kbps(bit_rate_kbps),
-    .freq(freq)
+    .freq(freq),
+
+    .m_axis_data_tvalid(m_axis_data_tvalid),
+    .filtered_signal(filtered_signal),
+    .s_axis_data_tready(s_axis_data_tready)
 );
 
 // 实例化AM解调模块
@@ -81,7 +136,11 @@ am_demod u_am_demod(
     .ad_data(ad_data),
     .demod_out(demod_out),
     .ma(ma),
-    .freq(freq)
+    .freq(freq),
+
+    .m_axis_data_tvalid(m_axis_data_tvalid),
+    .filtered_signal(filtered_signal),
+    .s_axis_data_tready(s_axis_data_tready)
 );
 
 // 输出信号类型指示

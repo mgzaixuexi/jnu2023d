@@ -5,6 +5,11 @@ module ask_demod(
     input         en,
     input  [9:0]  ad_data,
     
+
+    input   m_axis_data_tvalid,
+    input [39:0] filtered_signal,
+    input   s_axis_data_tready,
+
     output reg    bit_out,
     output reg    bit_valid,
     output [3:0]  bit_rate_kbps,
@@ -13,11 +18,6 @@ module ask_demod(
 
 // 保持您原有的参数和信号声明
 parameter THRESHOLD = 16'd8000;
-reg signed [15:0] centered;
-reg [15:0] rectified;
-wire [39:0] filtered_signal;
-wire s_axis_data_tready;
-wire m_axis_data_tvalid;
 reg [15:0] filtered_reg;
 reg [15:0] prev_filtered;
 
@@ -31,13 +31,9 @@ reg        rate_valid ;    // 码率有效标志
 // 保持您原有的信号处理流水线
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-        centered <= 0;
-        rectified <= 0;
         filtered_reg <= 0;
         prev_filtered <= 0;
     end else begin
-        centered <= {6'b0, ad_data} - 16'd512;
-        rectified <= (centered < 0) ? -centered : centered;
         if (m_axis_data_tvalid) begin
             prev_filtered <= filtered_reg;
             filtered_reg <= filtered_signal[30:15];
@@ -45,15 +41,6 @@ always @(posedge clk or negedge rst_n) begin
     end
 end
 
-// 保持您原有的FIR滤波器
-fir_compiler_1 u_fir_filter (
-  .aclk(clk),
-  .s_axis_data_tvalid(1'b1),
-  .s_axis_data_tready(s_axis_data_tready),
-  .s_axis_data_tdata(rectified),
-  .m_axis_data_tvalid(m_axis_data_tvalid),
-  .m_axis_data_tdata(filtered_signal)
-);
 
 // 改进的码率检测逻辑（在30MHz时钟域）
 reg [15:0] edge_counter ;      // 边沿间隔计数器
