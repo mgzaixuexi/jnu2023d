@@ -34,7 +34,7 @@ wire [39:0] demolate_signal;
 wire s_axis_dalta_tready;
 wire m_axis_data_tvalid;
 
-fir_compiler_0 u_fir_compiler_0 (             //低通滤波
+fir_compiler_1 u_fir_compiler_0 (             //低通滤波
   .aclk(clk),                              // input wire aclk
   .s_axis_data_tvalid(1),  // input wire s_axis_data_tvalid
   .s_axis_data_tready(s_axis_dalta_tready),  // output wire s_axis_data_tready

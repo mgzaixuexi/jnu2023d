@@ -20,12 +20,12 @@ parameter LOW_LEVEL_THRESHOLD = 10; // 判断为低电平的阈值
 // 信号检测相关寄存器
 reg [15:0] sample_counter = 0;
 reg [15:0] zero_count = 0;
-reg signal_type = 0;  // 0:AM, 1:ASK
-reg type_valid = 0;
+reg signal_type ;  // 0:AM, 1:ASK
+reg type_valid ;
 
 // 模块使能信号
-wire ask_en = (signal_type && type_valid);
-wire am_en = (!signal_type && type_valid);
+wire ask_en = (signal_type & type_valid);
+wire am_en = (~signal_type & type_valid);
 
 // 信号类型检测
 always @(posedge clk or negedge rst_n) begin

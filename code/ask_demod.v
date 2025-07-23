@@ -22,11 +22,11 @@ reg [15:0] filtered_reg;
 reg [15:0] prev_filtered;
 
 // 新增码率检测信号
-reg [15:0] rise_pos = 0;      // 上升沿位置
-reg [15:0] fall_pos = 0;      // 下降沿位置 
-reg [15:0] half_period = 0;   // 半周期测量值
-reg [3:0]  detected_rate = 6; // 检测到的码率
-reg        rate_valid = 0;    // 码率有效标志
+reg [15:0] rise_pos ;      // 上升沿位置
+reg [15:0] fall_pos ;      // 下降沿位置 
+reg [15:0] half_period ;   // 半周期测量值
+reg [3:0]  detected_rate ; // 检测到的码率
+reg        rate_valid ;    // 码率有效标志
 
 // 保持您原有的信号处理流水线
 always @(posedge clk or negedge rst_n) begin
@@ -46,7 +46,7 @@ always @(posedge clk or negedge rst_n) begin
 end
 
 // 保持您原有的FIR滤波器
-fir_compiler_0 u_fir_filter (
+fir_compiler_1 u_fir_filter (
   .aclk(clk),
   .s_axis_data_tvalid(1'b1),
   .s_axis_data_tready(s_axis_data_tready),
@@ -56,11 +56,9 @@ fir_compiler_0 u_fir_filter (
 );
 
 // 改进的码率检测逻辑（在30MHz时钟域）
-reg [15:0] edge_counter = 0;      // 边沿间隔计数器
-reg [15:0] high_duration = 0;     // 高电平持续时间测量值
-reg [3:0]  detected_rate = 6;     // 检测到的码率 (默认6kbps)
-reg        rate_valid = 0;        // 码率有效标志
-reg        last_state = 0;        // 前一个状态记录
+reg [15:0] edge_counter ;      // 边沿间隔计数器
+reg [15:0] high_duration ;     // 高电平持续时间测量值
+reg [3:0] last_state;
 
 always @(posedge clk_30M or negedge rst_n) begin
     if (!rst_n) begin
@@ -115,7 +113,7 @@ always @(posedge clk_30M or negedge rst_n) begin
     end
 end
 // 码率同步检测
-reg [3:0] last_detected_rate = 6;
+reg [3:0] last_detected_rate ;
 wire rate_changed = (detected_rate != last_detected_rate) && rate_valid;
 
 // 解调判决逻辑（增加码率同步）
